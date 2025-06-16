@@ -1,18 +1,19 @@
-import requests
-import json
+from groq import Groq
 
-url = "http://localhost:11434/api/generate"
+client = Groq(api_key="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")
 
-data = {
-    "model": "gemma3:1b",
-    "prompt": "Hola",
-    "stream": False
-}
+completion = client.chat.completions.create(
+    model="meta-llama/llama-4-scout-17b-16e-instruct",
+    messages=[
+        {
+            "role": "user",
+            "content": "¿Cuál es la capital de Japón?"  # ✅ Asegúrate de que esto no esté vacío
+        }
+    ],
+    temperature=1,
+    max_tokens=1024,
+    top_p=1,
+    stream=False
+)
 
-response = requests.post(url, json=data)
-
-# Convertir el texto de la respuesta a un diccionario
-respuesta_json = json.loads(response.text)
-
-# Imprimir el valor de la clave "response"
-print(respuesta_json["response"])
+print(completion.choices[0].message.content)
