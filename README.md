@@ -27,3 +27,6 @@ curl http://localhost:11434/api/generate -d '{
 
 # Api Key
 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
+
+# Ejecutar aplicacion fast api
+uvicorn main:app --reload --host 0.0.0.0 --port 8000

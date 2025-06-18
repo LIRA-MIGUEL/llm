@@ -55,6 +55,8 @@ Aquí tienes el contenido de un archivo CSV:
 Con base en este contenido, responde la siguiente pregunta como un experto en análisis de datos:
 
 {pregunta}
+
+Si tu respuesta incluye datos en forma de tabla, preséntalos en formato Markdown.
 """
 
         payload = {
