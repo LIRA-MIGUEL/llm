@@ -1,21 +1,29 @@
 from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 import pandas as pd
 import io
-from groq import Groq
+import requests
+import os
+import re
+
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "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")
+
+df_cache = None
 
 app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Cambia esto a tus dominios si es necesario
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-client = Groq(api_key="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")
-
-df_cache = None
+@app.get("/", response_class=HTMLResponse)
+async def index():
+    with open("templates/index.html", "r", encoding="utf-8") as f:
+        return f.read()
 
 @app.post("/upload_csv/")
 async def upload_csv(file: UploadFile = File(...)):
@@ -34,22 +42,62 @@ async def preguntar(pregunta: str = Form(...)):
         return {"error": "No se ha subido un archivo CSV aún"}
 
     try:
-        # Limitamos la tabla para no pasar demasiados datos al prompt
-        contexto = df_cache.head(10).to_string(index=False)
+        context = df_cache.to_csv(index=False)
+        if len(context) > 12000:
+            context = df_cache.head(50).to_csv(index=False)
+
         prompt = f"""
-Tengo la siguiente tabla (primeras filas):
+Eres un experto en análisis de datos con Python y pandas.
 
-{contexto}
+Ya tienes cargado un DataFrame llamado 'df' que contiene los datos del CSV.
 
-Pregunta: {pregunta}
-Responde como un analista de datos profesional, con precisión y claridad.
+Genera exclusivamente el código en Python usando el DataFrame 'df' para responder esta pregunta:
+
+\"{pregunta}\"
+
+No expliques nada, no leas archivos CSV ni declares variables para cargar datos. Solo responde con un bloque de código Python entre triple backticks, usando solo 'df'.
 """
 
-        chat = client.chat.completions.create(
-            model="llama3-8b-8192",
-            messages=[{"role": "user", "content": prompt}],
-        )
-        respuesta = chat.choices[0].message.content
-        return {"respuesta": respuesta}
+        payload = {
+            "model": "meta-llama/llama-4-scout-17b-16e-instruct",
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.2,
+            "max_tokens": 1024,
+            "top_p": 1,
+            "stream": False,
+        }
+
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {GROQ_API_KEY}",
+        }
+
+        response = requests.post("https://api.groq.com/openai/v1/chat/completions", json=payload, headers=headers)
+        if response.status_code != 200:
+            return {"error": f"Error del modelo: {response.text}"}
+
+        data = response.json()
+        answer = data["choices"][0]["message"]["content"]
+
+        match = re.search(r"```(?:python)?\n(.*?)```", answer, re.DOTALL)
+        code_str = match.group(1).strip() if match else answer.strip()
+
+        local_vars = {'df': df_cache.copy()}
+        exec(f"result = {code_str}", {}, local_vars)
+        result = local_vars['result']
+
+        if hasattr(result, "to_dict"):
+            result_json = result.to_dict(orient="records")
+        else:
+            result_json = str(result)
+
+        return {
+            "codigo_python": code_str,
+            "resultado": result_json
+        }
+
     except Exception as e:
-        return {"error": f"Error al procesar la pregunta: {str(e)}"}
+        return {
+            "codigo_python": code_str if 'code_str' in locals() else "",
+            "error": f"Error al ejecutar el código: {str(e)}"
+        }
