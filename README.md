@@ -30,3 +30,12 @@ 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
 
 # Ejecutar aplicacion fast api
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
+
+# Carpeta backend
+Contiene el archivo main y la carpeta templates con un index. Este codigo hconvierte el lenguaje humano y lo convierte en consultas de numpy y pandas.(Pendiente a terminar)
+
+# Carpeta ollama
+contiene ejemplos con modelos de grop
+
+# Archivo main.py y templates en la raiz del proyecto
+Proyecto donde cargas un csv le haces una pregunta y te devuelve los datos de la pregunta hecha
