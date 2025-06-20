@@ -6,6 +6,8 @@ import io
 import requests
 import os
 import re
+import sys
+import contextlib
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "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")
 
@@ -31,6 +33,8 @@ async def upload_csv(file: UploadFile = File(...)):
     try:
         contents = await file.read()
         df_cache = pd.read_csv(io.BytesIO(contents))
+        print("CSV cargado:")
+        print(df_cache.head())
         return {"message": "Archivo CSV cargado correctamente"}
     except Exception as e:
         return {"error": f"Error al procesar el archivo CSV: {str(e)}"}
@@ -82,14 +86,33 @@ No expliques nada, no leas archivos CSV ni declares variables para cargar datos.
         match = re.search(r"```(?:python)?\n(.*?)```", answer, re.DOTALL)
         code_str = match.group(1).strip() if match else answer.strip()
 
-        local_vars = {'df': df_cache.copy()}
-        exec(f"result = {code_str}", {}, local_vars)
-        result = local_vars['result']
+        print("Código generado por el modelo:\n", code_str)
 
+        local_vars = {'df': df_cache.copy()}
+        output = io.StringIO()
+
+        try:
+            with contextlib.redirect_stdout(output):
+                exec(code_str, {}, local_vars)
+
+            if 'result' in local_vars:
+                result = local_vars['result']
+            else:
+                result = output.getvalue().strip()  # Lo que se imprimió
+
+        except Exception as e:
+            return {
+                "codigo_python": code_str,
+                "error": f"Error al ejecutar el código: {str(e)}"
+            }
+
+        # Convertir a JSON si es posible
         if hasattr(result, "to_dict"):
             result_json = result.to_dict(orient="records")
         else:
             result_json = str(result)
+
+        print("Resultado generado:", result_json)
 
         return {
             "codigo_python": code_str,
@@ -99,5 +122,5 @@ No expliques nada, no leas archivos CSV ni declares variables para cargar datos.
     except Exception as e:
         return {
             "codigo_python": code_str if 'code_str' in locals() else "",
-            "error": f"Error al ejecutar el código: {str(e)}"
+            "error": f"Error inesperado: {str(e)}"
         }
