@@ -39,3 +39,6 @@ contiene ejemplos con modelos de grop
 
 # Archivo main.py y templates en la raiz del proyecto
 Proyecto donde cargas un csv le haces una pregunta y te devuelve los datos de la pregunta hecha
+
+# Ejecucion del modelo
+ollama run deepseek-r1:1.5b
